@@ -2,11 +2,11 @@
 % Created 1/27/2023
 
 clear; clc; close all
-%% Import Data
+%% Plot Commands
     PlotOn = false;
     PlotOn2 = true;
 
-% Parameters
+%% Parameters
     nu = 2.317e-5; % Kinematic viscocity of air at 25 C [m^2/s]
     k = 3.186e-2; % Thermal conductivity of copper [W/(mK)]
     rho = 0.9413; % Density of air [kg/m^3]
@@ -15,6 +15,11 @@ clear; clc; close all
     L = 0.009; % Distance from duct to plate [m]
     Sens_Res = 5; % Resistance of sensor
     A = pi*(0.0762/2)^2; % Area of plate [m^2]
+    temp = 75:25:150;
+    temp2 = 50:25:150;
+    spd = [35, 45 55, 75, 85, 100];
+
+%% Anemometer Calibration
 
 % Anemometer 0 in
     AnemCal.Recorded_Flow.D0 = [9, 18, 27, 36, 43]; % Data reported air speed [unitless]
@@ -35,14 +40,20 @@ clear; clc; close all
     AnemCal.Recorded_Flow.D1pt2 = [9, 18, 27, 36, 43]; % Data reported air speed [unitless]
     AnemCal.Recorded_PercentSpd.D1pt2 = [20, 40, 60, 80, 100]; % Recorded fan speed [%]
     AnemCal.Anem_Flow.D1pt2 = [1, 2.5, 4.1, 6.1, 7.3]; % Anemometer air velocity [m^3/s]
+%% Plate Calibration
 
 % Plate Temperature
-    PlateCal.Temps = [0, 47.8224, 70.956, 95.256, 124.42, 148.91]; % Plate temperature
-    PlateCal.Pad_Voltage = [0, 174.586, 173.188, 170.991, 167.795, 166.396]; % Heating pad voltage
-    PlateCal.Sens_Voltage = [0, 0.0733, 0.1613, 0.279, 0.4301, 0.489]; % Sensor voltage
-    PlateCal.Sens_Curr = PlateCal.Sens_Voltage./Sens_Res; % Sensor current
 
-%Plate Power
+    for i = 1:length(temp2)
+        filename = sprintf('Heat Transfer %iC', temp2(i));
+        matrix = readmatrix(filename);
+        PlateCal.Temps(i) = mean(matrix(end-30:end, 2));
+        PlateCal.Pad_Voltage(i) = mean(matrix(end-30:end, 3));
+        PlateCal.Sens_Voltage(i) = mean(matrix(end-30:end, 4));
+        PlateCal.Sens_Curr = PlateCal.Sens_Voltage./Sens_Res; %Sensor Current
+    end
+
+% Plate Power
     PlateCal.Power = (PlateCal.Pad_Voltage - PlateCal.Sens_Voltage) .* PlateCal.Sens_Curr; % Plate power
     PlateCal.HeatFlux = PlateCal.Power./A; % Heat Flux
 
@@ -217,106 +228,59 @@ end
 Exp.Re_vec = [Exp.Flow35.Re, Exp.Flow45.Re, Exp.Flow55.Re, Exp.Flow75.Re,...
     Exp.Flow85.Re, Exp.Flow100.Re]; % Vector of Reynold's Numbers
 
-% Experiment 1
-    
-    Temp75.ActualPlateTemp = [72.9, 72.32, 72.51, 71.34, 71.34, 71.15];
-    Temp75.ActualAirTemp = [21.97, 22.74, 22.36, 23.52, 23.13, 23.72];
+%% Import Data
 
-    Temp75.h_coeff = interp1(PlateCal.Temps, PlateCal.HeatFlux, 75)...
-        ./(Temp75.ActualPlateTemp - Temp75.ActualAirTemp); % Heat transfer coefficient for experiment 1
-    Temp75.NuL = interp1(PlateCal.Temps, PlateCal.HeatFlux, 75).*L./(k.*...
-        (Temp75.ActualPlateTemp - Temp75.ActualAirTemp)); % Nusselt number for experiment 1
+Temp.ActualPlateTemp = zeros(4, 6);
+Temp.ActualAirTemp = zeros(4,6);
 
-% Experiment 2
+for i = 1:length(temp)
+    for j = 1:length(spd)
+       filename = sprintf('temp%iCwind%i', temp(i), spd(j));
+       matrix = readmatrix(filename);
+       Temp.ActualPlateTemp(i, j) = mean(matrix(end-30:end, 2));
+       Temp.ActualAirTemp(i,j) = mean(matrix(end-30:end, 6));
+    end
+end
 
-    Temp100.ActualPlateTemp = [97.98, 97.01, 96.62, 95.45, 94.87, 94.67]; % Recorded plate temp at various flow speeds [C]
-    Temp100.ActualAirTemp = [23.91, 23.71, 24.49, 22.94, 24.11, 24.49]; % Recorded air temp at various flow speeds [C]
 
-    Temp100.h_coeff = interp1(PlateCal.Temps, PlateCal.HeatFlux, 100)...
-        ./(Temp100.ActualPlateTemp - Temp100.ActualAirTemp); % Heat transfer coefficient for experiment 2
-    Temp100.NuL = interp1(PlateCal.Temps, PlateCal.HeatFlux, 100).*L./(k.*...
-        (Temp100.ActualPlateTemp - Temp100.ActualAirTemp)); % Nusselt number for experiment 2
+%% Calculating Nu and H
 
-% Experiment 3
+Temp.h_coeff = zeros(4,6);
+Temp.NuL = zeros(4,6);
 
-    Temp125.ActualPlateTemp = [121.69, 120.92, 119.94, 118.78, 118.39, 117.81]; % Recorded plate temp at various flow speeds [C]
-    Temp125.ActualAirTemp = [24.11, 23.91, 23.13, 23.72, 24.88, 23.72]; % Recorded air temp at various flow speeds [C]
+for i = 1:length(temp)-1
+        Temp.h_coeff(i,:) = interp1(PlateCal.Temps, PlateCal.HeatFlux, temp(i))...
+            ./(Temp.ActualPlateTemp(i,:) - Temp.ActualAirTemp(i,:)); % Heat transfer coeff
+        Temp.NuL(i,:) = interp1(PlateCal.Temps, PlateCal.HeatFlux, temp(i)).*L./(k.*...
+            (Temp.ActualPlateTemp(i,:) - Temp.ActualAirTemp(i,:))); % Nusselt number
+end
 
-    Temp125.h_coeff = interp1(PlateCal.Temps, PlateCal.HeatFlux, 125)...
-        ./(Temp125.ActualPlateTemp - Temp125.ActualAirTemp); % Heat transfer coefficient for experiment 3
-    Temp125.NuL = interp1(PlateCal.Temps, PlateCal.HeatFlux, 125).*L./(k.*...
-        (Temp125.ActualPlateTemp - Temp125.ActualAirTemp)); % Nusselt number for experiment 3
+% Since the plate never reaches 150C, the for loop cannot interpolate the
+% heat flux, so a calculation is needed just for the 150C trial
 
-% Experiment 4
+Temp.h_coeff(end,:) = PlateCal.HeatFlux(end)./...
+    (Temp.ActualPlateTemp(end,:) - Temp.ActualAirTemp(end,:)); % Heat transfer coeff for exp 4
+Temp.NuL(end,:) = PlateCal.HeatFlux(end).*L./(k.*...
+        (Temp.ActualPlateTemp(end,:) - Temp.ActualAirTemp(end,:))); % Nusselt number for exp 4
 
-    Temp150.ActualPlateTemp = [145.22, 144.05, 143.66, 141.52, 141.33, 140.16]; % Recorded plate temp at various flow speeds [C]
-    Temp150.ActualAirTemp = [23.33, 22.74, 23.13, 22.55, 22.94, 22.74]; % Recorded air temp at various flow speeds [C]
-
-    Temp150.h_coeff = PlateCal.HeatFlux(end)...
-        ./(Temp150.ActualPlateTemp - Temp150.ActualAirTemp); % Heat transfer coefficient for experiment 4
-    Temp150.NuL = PlateCal.HeatFlux(end).*L./(k.*...
-        (Temp150.ActualPlateTemp - Temp150.ActualAirTemp)); % Nusselt number for experiment 4
+%% Plotting Experimental Data
 
 if PlotOn2 == true
 
-% Experiment 1 Plots
-    figure(6)
-    subplot(2,1,1)
-    plot(sqrt(Exp.Re_vec), Temp75.h_coeff, Linewidth = 1.25, Marker = "diamond" , Color = [.85 0 .14]);
-    grid on
-    % title('Heat Transfer Coefficient [H] vs. Square Root of Reynold''s Number at 75 Degrees C');
-    xlabel('Square Root of Reynold''s Number');
-    ylabel('H');
-    subplot(2,1,2)
-    plot(sqrt(Exp.Re_vec), Temp75.NuL, Linewidth = 1.25, Marker = "diamond" , Color = [0 .1 .9]);
-    grid on
-    % title('Experimental Nusselt Number [Nu_L] vs. Square Root of Reynold''s Number at 75 Degrees C');
-    xlabel('Square Root of Reynold''s Number');
-    ylabel('Nu_L');
+    for i = 1:length(temp)
+    
+        figure(i)
+        subplot(2,1,1)
+        plot(sqrt(Exp.Re_vec), Temp.h_coeff(i,:), Linewidth = 1.25, Color = [.9 0 .1], Marker = "diamond");
+        xlabel('Square Root of Reynold''s Number');
+        ylabel('Heat Transfer Coefficient [h]');
+        axis([28 56 min(Temp.h_coeff(i,:))-.25 max(Temp.h_coeff(i,:))+.25]);
+    
+        subplot(2,1,2)
+        plot(sqrt(Exp.Re_vec), Temp.NuL(i,:), Linewidth = 1.25, Color = [0 .1 .9], Marker = "diamond");
+        xlabel('Square Root of Reynold''s Number');
+        ylabel('Heat Transfer Coefficient [h]');
+        axis([28 56 min(Temp.NuL(i,:))-.25 max(Temp.NuL(i,:))+.25]);
 
-% Experiment 2 Plots
-    figure(7)
-    subplot(2,1,1)
-    plot(sqrt(Exp.Re_vec), Temp100.h_coeff, Linewidth = 1.25, Marker = "diamond" , Color = [.85 0 .14]);
-    grid on
-    % title('Heat Transfer Coefficient [H] vs. Square Root of Reynold''s Number at 100 Degrees C');
-    xlabel('Square Root of Reynold''s Number');
-    ylabel('H');
-    subplot(2,1,2)
-    plot(sqrt(Exp.Re_vec), Temp100.NuL, Linewidth = 1.25, Marker = "diamond" , Color = [0 .1 .9]);
-    grid on
-    % title('Experimental Nusselt Number [Nu_L] vs. Square Root of Reynold''s Number at 100 Degrees C');
-    xlabel('Square Root of Reynold''s Number');
-    ylabel('Nu_L');
-
-% Experiment 3 Plots
-    figure(8)
-    subplot(2,1,1)
-    plot(sqrt(Exp.Re_vec), Temp125.h_coeff, Linewidth = 1.25, Marker = "diamond" , Color = [.85 0 .14]);
-    grid on
-    % title('Heat Transfer Coefficient [H] vs. Square Root of Reynold''s Number at 125 Degrees C');
-    xlabel('Square Root of Reynold''s Number');
-    ylabel('H');
-    subplot(2,1,2)
-    plot(sqrt(Exp.Re_vec), Temp125.NuL, Linewidth = 1.25, Marker = "diamond" , Color = [0 .1 .9]);
-    grid on
-    % title('Experimental Nusselt Number [Nu_L] vs. Square Root of Reynold''s Number at 125 Degrees C');
-    xlabel('Square Root of Reynold''s Number');
-    ylabel('Nu_L');
-
-% Experiment 4 Plots
-    figure(9)
-    subplot(2,1,1)
-    plot(sqrt(Exp.Re_vec), Temp150.h_coeff, Linewidth = 1.25, Marker = "diamond" , Color = [.85 0 .14]);
-    grid on
-    % title('Heat Transfer Coefficient [H] vs. Square Root of Reynold''s Number at 150 Degrees C');
-    xlabel('Square Root of Reynold''s Number');
-    ylabel('H');
-    subplot(2,1,2)
-    plot(sqrt(Exp.Re_vec), Temp150.NuL, Linewidth = 1.25, Marker = "diamond" , Color = [0 .1 .9]);
-    grid on
-    % title('Experimental Nusselt Number [Nu_L] vs. Square Root of Reynold''s Number at 150 Degrees C');
-    xlabel('Square Root of Reynold''s Number');
-    ylabel('Nu_L');
-
+    end
 end
