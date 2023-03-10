@@ -1,5 +1,4 @@
-% This script will plot stress strain data for the standard dogbones
-
+% This script will plot stress strain data for the specimens
 % Giordano Liska
 % MAE 171A Solids Lab
 % Created 2-24-2023
@@ -18,12 +17,41 @@ DR = 0.4064; % Material density ratio [unitless]
 
 %% Import Data
 
+
 cs1.data = readmatrix('PMMA_CustomSpecimenFracture1_02242023.xlsx');
+for i = 1:7
+    filename = sprintf('cs1-DICe_%i.txt', i);
+    dat = readmatrix(filename);
+    cs1.dice(:,:,i) = dat;
+end
+
 cs2.data = readmatrix('PMMA_CustomSpecimenFracture2_02242023.xlsx');
+for i = 1:7
+    filename = sprintf('cs2-DICe_%i.txt', i);
+    dat = readmatrix(filename);
+    cs2.dice(:,:,i) = dat;
+end
+
 cs3.data = readmatrix('PMMA_CustomSpecimenFracture3_02242023.xlsx');
+for i = 1:7
+    filename = sprintf('cs3-DICe_%i.txt', i);
+    dat = readmatrix(filename);
+    cs3.dice(:,:,i) = dat;
+end
 
 ssf1.data = readmatrix('PMMA_StandardDogboneFracture1_02102023.csv');
+for i = 1:18
+    filename = sprintf('DICe_solution_%i', i+2267);
+    dat = readmatrix(filename);
+    ssf1.dice(:,:,i) = dat;
+end
+
 ssf2.data = readmatrix('PMMA_StandardDogboneFracture2_02102023.csv');
+for i = 1:20
+    filename = sprintf('DICe_solution_%i', i+2295);
+    dat = readmatrix(filename);
+    ssf2.dice(:,:,i) = dat;
+end
 
 ssu.data = readmatrix('PMMA_StandardDogboneUnloading_02102023.csv');
 
@@ -91,6 +119,46 @@ ssf1.YoungMod = (ssf1.EngStress(10)-ssf1.EngStress(5))/(ssf1.EngStrain(10)-ssf1.
 ssf2.YoungMod = (ssf1.EngStress(10)-ssf1.EngStress(5))/(ssf1.EngStrain(10)-ssf1.EngStrain(5)); % Young's modulus for bulk specimen 2
 
 YoungMod_Vec = [cs1.YoungMod, cs2.YoungMod, cs3.YoungMod, ssf1.YoungMod, ssf2.YoungMod]; % Vector of young's modulus for both specimens
+
+%% Calculate Poisson's Ratio
+
+for i = 1:7
+    cs1_strainyy_vec(i) = mean(cs1.dice(:,12,1));
+    cs1_strainxx_vec(i) = mean(cs1.dice(:,11,1));
+end
+
+cs1.poisson = mean(cs1_strainyy_vec)/(mean(cs1_strainxx_vec))/DR;
+
+for i = 1:7
+    cs2_strainyy_vec(i) = mean(cs2.dice(:,12,1));
+    cs2_strainxx_vec(i) = mean(cs2.dice(:,11,1));
+end
+
+cs2.poisson = mean(cs2_strainyy_vec)/(mean(cs2_strainxx_vec))/DR;
+
+for i = 1:7
+    cs3_strainyy_vec(i) = mean(cs3.dice(:,12,1));
+    cs3_strainxx_vec(i) = mean(cs3.dice(:,11,1));
+end
+
+cs3.poisson = mean(cs3_strainyy_vec)/(mean(cs3_strainxx_vec))/DR;
+
+for i = 1:18
+    ssf1_strainyy_vec(i) = mean(ssf1.dice(:,12,1));
+    ssf1_strainxx_vec(i) = mean(ssf1.dice(:,11,1));
+end
+
+ssf1.poisson = mean(ssf1_strainyy_vec)/mean(ssf1_strainxx_vec);
+
+for i = 1:20
+    ssf2_strainyy_vec(i) = mean(ssf2.dice(:,12,1));
+    ssf2_strainxx_vec(i) = mean(ssf2.dice(:,11,1));
+end
+
+ssf2.poisson = mean(ssf2_strainyy_vec)/mean(ssf2_strainxx_vec);
+
+poisson_vec = [cs1.poisson, cs2.poisson, cs3.poisson, ssf1.poisson, ssf2.poisson];
+
 %% Plot Stress-Strain Curves
 
 if PlotOn == true
@@ -144,6 +212,11 @@ xnname = reordercats(xnname, {'Custom 1', 'Custom 2', 'Custom 3', 'Bulk 1', 'Bul
 bar(xnname, YoungMod_Vec);
 xlabel('Specimen');
 ylabel('Young''s Modulus [MPa]');
+
+figure(9)
+bar(xnname, poisson_vec);
+xlabel('Specimen');
+ylabel('Poisson''s Ratio');
 
 end
 
